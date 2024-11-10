@@ -150,6 +150,20 @@ Hello PickleRick! From myapp-f4f69795b-2lfz5 on minikube-m03
 
 Review `kubectl -n myapp get events` and `kubectl -n myapp describe deployment myapp` for clues.
 
+### Remove everything.
+
+Remove minikube
+
+```
+minikube delete
+```
+
+Remove the registry proxy
+
+```
+docker stop registry_proxy
+```
+
 ### KubeLinter (optional)
 
 Validate your kubernetes yaml files with [KubeLinter](https://docs.kubelinter.io/#/?id=installing-kubelinter).

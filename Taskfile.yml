@@ -33,17 +33,20 @@ tasks:
       - kubectl apply -f myapp.yaml
       - kubectl -n myapp get pods
 
+  myapp-remove:
+    desc: Remove myapp from kubernetes.
+    cmds:
+      - kubectl delete -f myapp.yaml
+  
   myapp-init:
-    desc: Deploy myapp to kubernetes.
-    preconditions:
-      - test -f myapp.yaml
+    desc: Setup minikube and deploy myapp to kubernetes.
     cmds:
       - task: minikube-deploy
       - task: myapp-image-push
       - task: myapp-deploy
 
   myapp-kube-validate:
-    desc: Validate myapp k8s yaml file(s).
+    desc: Validate myapp k8s yaml file with kube-linter.
     preconditions:
       - test -f myapp.yaml
     cmds:
@@ -51,8 +54,8 @@ tasks:
       - kubectl apply --dry-run=client -f myapp.yaml
   
   infra-destroy:
-    desc: Destroy EVERYTHING
-    prompt: This will remove your current minikube service and the docker registry proxy. Are you sure?
+    desc: Remove minikube instance and docker registry proxy.
+    prompt: This will remove your current minikube instance and the docker registry proxy. Are you sure?
     cmds:
       - cmd: minikube delete
         ignore_error: true
