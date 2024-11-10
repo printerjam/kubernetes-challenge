@@ -1,0 +1,60 @@
+version: '3'
+
+tasks:
+  minikube-deploy:
+    desc: Start minikube infrastructure.
+    cmds:
+      - minikube start --nodes 3 --addons=ingress,registry
+      - kubectl label node minikube-m02 node-role.kubernetes.io/worker=worker
+      - kubectl label node minikube-m03 node-role.kubernetes.io/worker=worker
+      - kubectl taint nodes minikube node-role.kubernetes.io/master:NoSchedule
+      - kubectl get nodes
+      - docker run -d --rm --name=registry_proxy --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:$(minikube ip):5000"
+
+  myapp-image-build:
+    desc: Build myapp docker image.
+    preconditions:
+      - test -f Dockerfile
+    cmds:
+      - docker build -t localhost:5000/myapp:v1 .
+  
+  myapp-image-push:
+    desc: Push myapp docker image to minikube registry.
+    deps:
+      - myapp-image-build
+    cmds:
+      - docker push localhost:5000/myapp:v1
+
+  myapp-deploy:
+    desc: Deploy myapp to kubernetes.
+    preconditions:
+      - test -f myapp.yaml
+    cmds:
+      - kubectl apply -f myapp.yaml
+      - kubectl -n myapp get pods
+
+  myapp-init:
+    desc: Deploy myapp to kubernetes.
+    preconditions:
+      - test -f myapp.yaml
+    cmds:
+      - task: minikube-deploy
+      - task: myapp-image-push
+      - task: myapp-deploy
+  
+  myapp-destroy:
+    desc: Destroy myapp deployment
+    prompt: This will remove your current minikube service and the docker registry proxy. Are you sure?
+    cmds:
+      - cmd: minikube delete
+        ignore_error: true
+      - cmd: docker stop registry_proxy
+        ignore_error: true
+
+  kube-validate:
+    desc: Validate myapp k8s yaml file(s).
+    preconditions:
+      - test -f myapp.yaml
+    cmds:
+      - kube-linter lint myapp.yaml
+      - kubectl apply --dry-run=client -f myapp.yaml
