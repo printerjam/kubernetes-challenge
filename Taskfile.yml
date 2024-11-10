@@ -4,7 +4,7 @@ tasks:
   minikube-deploy:
     desc: Start minikube infrastructure.
     cmds:
-      - minikube start --nodes 3 --addons=ingress,registry
+      - minikube start --nodes 3 --addons=ingress,registry,metrics-server,dashboard
       - kubectl label node minikube-m02 node-role.kubernetes.io/worker=worker
       - kubectl label node minikube-m03 node-role.kubernetes.io/worker=worker
       - kubectl taint nodes minikube node-role.kubernetes.io/master:NoSchedule
@@ -41,20 +41,20 @@ tasks:
       - task: minikube-deploy
       - task: myapp-image-push
       - task: myapp-deploy
-  
-  myapp-destroy:
-    desc: Destroy myapp deployment
-    prompt: This will remove your current minikube service and the docker registry proxy. Are you sure?
-    cmds:
-      - cmd: minikube delete
-        ignore_error: true
-      - cmd: docker stop registry_proxy
-        ignore_error: true
 
-  kube-validate:
+  myapp-kube-validate:
     desc: Validate myapp k8s yaml file(s).
     preconditions:
       - test -f myapp.yaml
     cmds:
       - kube-linter lint myapp.yaml
       - kubectl apply --dry-run=client -f myapp.yaml
+  
+  infra-destroy:
+    desc: Destroy EVERYTHING
+    prompt: This will remove your current minikube service and the docker registry proxy. Are you sure?
+    cmds:
+      - cmd: minikube delete
+        ignore_error: true
+      - cmd: docker stop registry_proxy
+        ignore_error: true

@@ -31,21 +31,19 @@ $ eval (minkube docker-env)
 
 ### Prerequisites
 
-- (Docker)[https://docs.docker.com/engine/install/]
-- (kubectl)[https://kubernetes.io/docs/tasks/tools/#kubectl]
-- (Minikube)[https://minikube.sigs.k8s.io/docs/start/?arch=%2Flinux%2Fx86-64%2Fstable%2Fbinary+download]
+- [Docker](https://docs.docker.com/engine/install/)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/?arch=%2Flinux%2Fx86-64%2Fstable%2Fbinary+download])
 
 ### The kubernetes cluster
 
 #### Start minikube cluster with 3 nodes.
 
-```
-minikube start --nodes 3 --addons=ingress,registry
+```shell
+minikube start --nodes 3 --addons=ingress,registry,metrics-server,dashboard
 ```
 
-Verify the nodes in the cluster is ready with `kubectl get nodes`
-
-The output should look similar to
+Verify the nodes in the cluster are ready with `kubectl get nodes`
 
 ```
 NAME           STATUS   ROLES           AGE    VERSION
@@ -54,28 +52,28 @@ minikube-m02   Ready    <none>          32s    v1.31.0
 minikube-m03   Ready    <none>          22s    v1.31.0
 ```
 
-#### Convert the cluster to 1 control-plane and 2 worker nodes.
+#### Convert the nodes in the cluster to 1 control-plane and 2 worker nodes.
 
 Label the worker nodes
 
-```
+```shell
 kubectl label node minikube-m02 node-role.kubernetes.io/worker=worker
 kubectl label node minikube-m03 node-role.kubernetes.io/worker=worker
 ```
 
-Taint the control-plane node to restrict deployments to the worker nodes. ( Similar to how a multi node production cluster would work. )
-
-```
-kubectl taint nodes minikube node-role.kubernetes.io/master:NoSchedule
-```
-
-The output from `kubectl get nodes` should be similar to
+The output from `kubectl get nodes` should now have ROLES set.
 
 ```
 NAME           STATUS   ROLES           AGE     VERSION
 minikube       Ready    control-plane   4m26s   v1.31.0
 minikube-m02   Ready    worker          2m51s   v1.31.0
 minikube-m03   Ready    worker          2m41s   v1.31.0
+```
+
+Taint the control-plane node to restrict deployments to the worker nodes only.
+
+```shell
+kubectl taint nodes minikube node-role.kubernetes.io/master:NoSchedule
 ```
 
 #### The docker registry
@@ -96,42 +94,39 @@ However, this isn't supported on a multi node minikube cluster.
 ❌  Exiting due to ENV_MULTINODE_CONFLICT: The docker-env command is incompatible with multi-node clusters. Use the 'registry' add-on: https://minikube.sigs.k8s.io/docs/handbook/registry/
 ```
 
-Instead we will use the minikube registry addon which was enabled in the initial setup and expose it to the host with a proxy service as described in the (documentation)[https://minikube.sigs.k8s.io/docs/handbook/].
+Instead we will use the minikube registry addon which was enabled in the initial setup and expose it to the host with a proxy service as described in the [documentation](https://minikube.sigs.k8s.io/docs/handbook/registry/).
 
-For a temporary registry proxy use:
-
-```
+```shell
 docker run -d --rm --name=registry_proxy --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:$(minikube ip):5000"
 ```
 
-## Application deployment
+## Application
 
-### Application image
+#### Build and push the application image to the local registry
 
-build and push the application image to the local registry
-
-```
+```shell
 docker build -t localhost:5000/myapp:v1 .
 docker push localhost:5000/myapp:v1
 ```
 
-### Application deployment
+#### Deploy the application to kubernetes(minikube)
 
-```
+```shell
 kubectl create -f myapp.yaml
 ```
 
-The output:
+The ouput from the above command should look like this.
 
 ```
 namespace/myapp created
 resourcequota/myapp created
 limitrange/myapp created
 networkpolicy.networking.k8s.io/myapp created
-configmap/myapp-cm created
+configmap/myapp created
 deployment.apps/myapp created
+horizontalpodautoscaler.autoscaling/myapp created
 service/myapp created
-ingress.networking.k8s.io/myapp-ingress created
+ingress.networking.k8s.io/myapp created
 ```
 
 Verify the deployment has 2/2 Ready with `kubectl -n myapp get deployment myapp`
@@ -146,10 +141,7 @@ Verify the application is accessible and loadbalancing via the ingress service w
 ```
 $ curl $(minikube ip)
 Hello PickleRick! From myapp-f4f69795b-dnw85 on minikube-m02
-$ curl $(minikube ip)
-Hello PickleRick! From myapp-f4f69795b-dnw85 on minikube-m02
-$ curl $(minikube ip)
-Hello PickleRick! From myapp-f4f69795b-2lfz5 on minikube-m03
+
 $ curl $(minikube ip)
 Hello PickleRick! From myapp-f4f69795b-2lfz5 on minikube-m03
 ```
@@ -160,9 +152,9 @@ Review `kubectl -n myapp get events` and `kubectl -n myapp describe deployment m
 
 ### KubeLinter (optional)
 
-Validate your kubernetes yaml files with (KubeLinter)[https://docs.kubelinter.io/#/?id=installing-kubelinter].
+Validate your kubernetes yaml files with [KubeLinter](https://docs.kubelinter.io/#/?id=installing-kubelinter).
 
-```
+```shell
 kube-linter lint myapp.yaml
 ```
 
@@ -176,26 +168,24 @@ No lint errors found!
 
 ### Taskfile (optional)
 
-- (https://taskfile.dev/)[https://taskfile.dev/]
+- [https://taskfile.dev/](https://taskfile.dev/)
 
 Review the Taskfile.yaml file.
 
-Start from scratch
-Remove any current deployment
+Start from scratch. Remove current deployment.
 
-```
-task myapp-destroy
+```shell
+task infra-destroy
 ```
 
 Create minikube infrastructure and deploy myapp
 
-```
+```shell
 task myapp-init
 ```
 
 ### Resources
 
-- (Kubernetes Documentation)[https://kubernetes.io/docs/home/]
-- (Minikube Documentation)[https://minikube.sigs.k8s.io/docs/]
-- (learnk8s - Production best practices)[https://learnk8s.io/production-best-practices]
-- (Kubernetes resouce limits)[https://home.robusta.dev/blog/stop-using-cpu-limits]
+- [Kubernetes Documentation](https://kubernetes.io/docs/home/)
+- [Minikube Documentation](https://minikube.sigs.k8s.io/docs/)
+- [learnk8s - Production best practices](https://learnk8s.io/production-best-practices)
